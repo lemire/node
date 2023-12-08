@@ -137,7 +137,7 @@ template("base64_gn_build") {
         ]
       } else if (is_win) {
         cflags_c = [ "/arch:AVX512" ],
-        cflags_cpp = []
+        cflags_cc = []
       }
     }
   }

@@ -10,7 +10,7 @@
       'target_name': 'histogram',
       'type': 'static_library',
       'cflags': ['-fvisibility=hidden'],
-      'cflags_cpp': [],
+      'cflags_cc': [],
       'xcode_settings': {
         'GCC_SYMBOLS_PRIVATE_EXTERN': 'YES',  # -fvisibility=hidden
       },
