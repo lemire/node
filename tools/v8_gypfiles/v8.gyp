@@ -462,7 +462,7 @@
             '<(python)',
             '<(V8_ROOT)/tools/snapshot/asm_to_inline_asm.py',
             '<@(_inputs)',
-            '<@(_outputs)',
+            '<(INTERMEDIATE_DIR)/embedded.cc',
           ],
         },
       ],
