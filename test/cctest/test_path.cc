@@ -61,6 +61,7 @@ TEST_F(PathTest, ToNamespacedPath) {
   EXPECT_EQ(data.ToStringView(), "");  // Empty string should not be mutated
   BufferValue data_2(isolate_,
                      v8::String::NewFromUtf8(isolate_, "c:").ToLocalChecked());
+  ToNamespacedPath(*env, &data_2);
   EXPECT_EQ(data_2.ToStringView(),
             "c:");  // Input less than equal to 2 characters
                     // should be returned directly
@@ -71,6 +72,7 @@ TEST_F(PathTest, ToNamespacedPath) {
           "C:\\workspace\\node-test-binary-windows-js-"
           "suites\\node\\test\\fixtures\\permission\\deny\\protected-file.md")
           .ToLocalChecked());
+  ToNamespacedPath(*env, &data_3);
   EXPECT_EQ(
       data_3.ToStringView(),
       "\\\\?\\C:\\workspace\\node-test-binary-windows-js-"
