@@ -1043,7 +1043,9 @@ static void InternalModuleStat(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
   CHECK(args[0]->IsString());
-  node::Utf8Value path(env->isolate(), args[0]);
+  BufferValue path(realm->isolate(), args[0]);
+  CHECK_NOT_NULL(*path);
+  ToNamespacedPath(env, &path);
   THROW_IF_INSUFFICIENT_PERMISSIONS(
       env, permission::PermissionScope::kFileSystemRead, path.ToStringView());
 
