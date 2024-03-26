@@ -304,8 +304,9 @@ void ToNamespacedPath(Environment* env, BufferValue* path) {
     path->AllocateSufficientStorage(new_length);
     path->SetLength(new_length);
     memcpy(path->out(), new_prefix.data(), new_prefix.size());
-    memcpy(
-        path->out() + new_prefix.size(), resolved_path.data(), resolved_path.size());
+    memcpy(path->out() + new_prefix.size(),
+           resolved_path.data(),
+           resolved_path.size());
   }
 #endif
 }
