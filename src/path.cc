@@ -294,15 +294,14 @@ void ToNamespacedPath(Environment* env, BufferValue* path) {
                resolved_path2.size());
       }
     }
-  } else if (IsWindowsDeviceRoot(resolved_path[0]) &&
-               resolved_path[1] == ':' && resolved_path[2] == '\\') {
+  } else if (IsWindowsDeviceRoot(resolved_path[0]) && resolved_path[1] == ':' &&
+             resolved_path[2] == '\\') {
     // Matched device root, convert the path to a long UNC path
     std::string_view new_prefix = R"(\\?\")";
     path->SetLength(new_prefix.size() + resolved_path.size());
     memcpy(&path, new_prefix.data(), new_prefix.size());
-    memcpy(&path + new_prefix.size(),
-            resolved_path.data(),
-            resolved_path.size());
+    memcpy(
+        &path + new_prefix.size(), resolved_path.data(), resolved_path.size());
   }
 
 #endif
