@@ -29,8 +29,8 @@ describe('node run [command]', () => {
     assert.strictEqual(child.code, 1);
   });
 
-  var adabatch = 'ada';
-  if(common.isWindows) {
+  let adabatch = 'ada';
+  if (common.isWindows) {
     adabatch = 'ada.bat';
   }
 
@@ -45,8 +45,8 @@ describe('node run [command]', () => {
     assert.strictEqual(child.code, 0);
   });
 
-  var posbatch = 'positional-args';
-  if(common.isWindows) {
+  let posbatch = 'positional-args';
+  if (common.isWindows) {
     posbatch = 'positional-args.bat';
   }
   it('appends positional arguments', async () => {
@@ -60,8 +60,8 @@ describe('node run [command]', () => {
     assert.strictEqual(child.code, 0);
   });
 
-  var cusbatch = 'custom-env';
-  if(common.isWindows) {
+  let cusbatch = 'custom-env';
+  if (common.isWindows) {
     cusbatch = 'custom-env.bat';
   }
   it('should support having --env-file cli flag', async () => {
