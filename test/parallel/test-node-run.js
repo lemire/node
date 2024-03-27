@@ -29,10 +29,15 @@ describe('node run [command]', () => {
     assert.strictEqual(child.code, 1);
   });
 
+  var adabatch = 'ada';
+  if(common.isWindows) {
+    adabatch = 'ada.bat';
+  }
+
   it('adds node_modules/.bin to path', async () => {
     const child = await common.spawnPromisified(
       process.execPath,
-      [ 'run', 'ada'],
+      [ 'run', adabatch],
       { cwd: fixtures.path('run-script') },
     );
     assert.match(child.stdout, /06062023/);
@@ -40,21 +45,29 @@ describe('node run [command]', () => {
     assert.strictEqual(child.code, 0);
   });
 
+  var posbatch = 'positional-args';
+  if(common.isWindows) {
+    posbatch = 'positional-args.bat';
+  }
   it('appends positional arguments', async () => {
     const child = await common.spawnPromisified(
       process.execPath,
-      [ 'run', 'positional-args', '--help "hello world test"'],
+      [ 'run', posbatch, '--help "hello world test"'],
       { cwd: fixtures.path('run-script') },
     );
-    assert.match(child.stdout, /--help hello world test/);
+    assert.match(child.stdout, /--help ["]*hello world test.*/);
     assert.strictEqual(child.stderr, '');
     assert.strictEqual(child.code, 0);
   });
 
+  var cusbatch = 'custom-env';
+  if(common.isWindows) {
+    cusbatch = 'custom-env.bat';
+  }
   it('should support having --env-file cli flag', async () => {
     const child = await common.spawnPromisified(
       process.execPath,
-      [ `--env-file=${fixtures.path('run-script/.env')}`, 'run', 'custom-env'],
+      [ `--env-file=${fixtures.path('run-script/.env')}`, 'run', cusbatch],
       { cwd: fixtures.path('run-script') },
     );
     assert.match(child.stdout, /hello world/);
