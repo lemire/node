@@ -305,7 +305,7 @@ size_t StringBytes::Write(Isolate* isolate,
                           Local<Value> val,
                           enum encoding encoding) {
   HandleScope scope(isolate);
-  size_t nbytes;
+  size_t nbytes{0};
 
   CHECK(val->IsString() == true);
   Local<String> str = val.As<String>();
@@ -346,14 +346,38 @@ size_t StringBytes::Write(Isolate* isolate,
     }
 
     case BASE64URL:
-      // Fall through
-    case BASE64:
+      // We follow https://infra.spec.whatwg.org/#forgiving-base64-decode adapted to base64url,
+      // decoding the base64url content while skipping ASCII spaces.
       if (str->IsExternalOneByte()) {
         auto ext = str->GetExternalOneByteStringResource();
-        nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
+        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, ext->data(), ext->length(), simdutf::base64_url);
+        if(res.error == simdutf::error_code::SUCCESS) {
+          nbytes = r.count;
+        }
       } else {
         String::Value value(isolate, str);
-        nbytes = base64_decode(buf, buflen, *value, value.length());
+        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, *value, value.length(), simdutf::base64_url);
+        if(res.error == simdutf::error_code::SUCCESS) {
+          nbytes = r.count;
+        }
+      }
+      break;
+
+    case BASE64:
+      // We follow https://infra.spec.whatwg.org/#forgiving-base64-decode, decoding the base64
+      // content while skipping ASCII spaces.
+      if (str->IsExternalOneByte()) {
+        auto ext = str->GetExternalOneByteStringResource();
+        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, ext->data(), ext->length(), simdutf::base64_default);
+        if(res.error == simdutf::error_code::SUCCESS) {
+          nbytes = r.count;
+        }
+      } else {
+        String::Value value(isolate, str);
+        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, *value, value.length(), simdutf::base64_default);
+        if(res.error == simdutf::error_code::SUCCESS) {
+          nbytes = r.count;
+        }
       }
       break;
 
@@ -615,7 +639,8 @@ MaybeLocal<Value> StringBytes::Encode(Isolate* isolate,
         *error = node::ERR_MEMORY_ALLOCATION_FAILED(isolate);
         return MaybeLocal<Value>();
       }
-
+      // by default, base64 uses libbase64's accelerated routine so
+      // it is not necessary to use simdutf.
       size_t written = base64_encode(buf, buflen, dst, dlen);
       CHECK_EQ(written, dlen);
 
@@ -623,14 +648,15 @@ MaybeLocal<Value> StringBytes::Encode(Isolate* isolate,
     }
 
     case BASE64URL: {
-      size_t dlen = base64_encoded_size(buflen, Base64Mode::URL);
+      // When in URL mode, base64_encode uses a non-accelerated routine, so we
+      // adopt simdutf.
+      size_t dlen = simdutf::base64_length_from_binary(buflen);
       char* dst = node::UncheckedMalloc(dlen);
       if (dst == nullptr) {
         *error = node::ERR_MEMORY_ALLOCATION_FAILED(isolate);
         return MaybeLocal<Value>();
       }
-
-      size_t written = base64_encode(buf, buflen, dst, dlen, Base64Mode::URL);
+      size_t written = simdutf::binary_to_base64(buf, buflen, dst, simdutf::base64_url);
       CHECK_EQ(written, dlen);
 
       return ExternOneByteString::New(isolate, dst, dlen, error);
