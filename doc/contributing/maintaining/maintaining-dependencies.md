@@ -295,7 +295,7 @@ a C++ library for fast JSON parsing.
 ### simdutf
 
 The [simdutf](https://github.com/simdutf/simdutf) dependency is
-a C++ library for fast UTF-8 decoding and encoding.
+a C++ library for fast character encoding (UTF-8, UTF-16, UTF-32, Latin1) and base64 decoding and encoding.
 
 ### undici
 
