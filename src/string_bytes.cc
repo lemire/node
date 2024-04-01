@@ -346,38 +346,14 @@ size_t StringBytes::Write(Isolate* isolate,
     }
 
     case BASE64URL:
-      // We follow https://infra.spec.whatwg.org/#forgiving-base64-decode adapted to base64url,
-      // decoding the base64url content while skipping ASCII spaces.
-      if (str->IsExternalOneByte()) {
-        auto ext = str->GetExternalOneByteStringResource();
-        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, ext->data(), ext->length(), simdutf::base64_url);
-        if(res.error == simdutf::error_code::SUCCESS) {
-          nbytes = r.count;
-        }
-      } else {
-        String::Value value(isolate, str);
-        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, *value, value.length(), simdutf::base64_url);
-        if(res.error == simdutf::error_code::SUCCESS) {
-          nbytes = r.count;
-        }
-      }
-      break;
-
+      // Fall through
     case BASE64:
-      // We follow https://infra.spec.whatwg.org/#forgiving-base64-decode, decoding the base64
-      // content while skipping ASCII spaces.
       if (str->IsExternalOneByte()) {
         auto ext = str->GetExternalOneByteStringResource();
-        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, ext->data(), ext->length(), simdutf::base64_default);
-        if(res.error == simdutf::error_code::SUCCESS) {
-          nbytes = r.count;
-        }
+        nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
       } else {
         String::Value value(isolate, str);
-        simdutf::result r = simdutf::base64_to_binary_safe(buf, buflen, *value, value.length(), simdutf::base64_default);
-        if(res.error == simdutf::error_code::SUCCESS) {
-          nbytes = r.count;
-        }
+        nbytes = base64_decode(buf, buflen, *value, value.length());
       }
       break;
 

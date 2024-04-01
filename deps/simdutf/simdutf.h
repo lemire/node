@@ -1,4 +1,4 @@
-/* auto-generated on 2024-04-01 11:16:53 -0400. Do not edit! */
+/* auto-generated on 2024-04-01 16:00:11 -0400. Do not edit! */
 /* begin file include/simdutf.h */
 #ifndef SIMDUTF_H
 #define SIMDUTF_H
@@ -594,7 +594,7 @@ SIMDUTF_DISABLE_UNDESIRED_WARNINGS
 #define SIMDUTF_SIMDUTF_VERSION_H
 
 /** The version of simdutf being used (major.minor.revision) */
-#define SIMDUTF_VERSION "5.1.0"
+#define SIMDUTF_VERSION "5.2.0"
 
 namespace simdutf {
 enum {
@@ -605,7 +605,7 @@ enum {
   /**
    * The minor version (major.MINOR.revision) of simdutf being used.
    */
-  SIMDUTF_VERSION_MINOR = 1,
+  SIMDUTF_VERSION_MINOR = 2,
   /**
    * The revision (major.minor.REVISION) of simdutf being used.
    */
@@ -2350,7 +2350,7 @@ simdutf_warn_unused result base64_to_binary(const char * input, size_t length, c
  * @param length        the length of the input in bytes
  * @return number of base64 bytes
  */
-simdutf_warn_unused size_t base64_length_from_binary(size_t length) noexcept;
+simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options = base64_default) noexcept;
 
 /**
  * Convert a binary input to a base64 ouput. The output is always padded with equal signs so that it is
@@ -3566,9 +3566,10 @@ public:
    * Provide the base64 length in bytes given the length of a binary input.
    *
    * @param length        the length of the input in bytes
+   * @parem options       the base64 options to use, can be base64_default or base64_url, is base64_default by default.
    * @return number of base64 bytes
    */
-  simdutf_warn_unused virtual size_t base64_length_from_binary(size_t length) const noexcept = 0;
+  simdutf_warn_unused virtual size_t base64_length_from_binary(size_t length, base64_options options = base64_default) const noexcept = 0;
 
   /**
    * Convert a binary input to a base64 ouput. The output is always padded with equal signs so that it is

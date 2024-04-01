@@ -1,4 +1,4 @@
-/* auto-generated on 2024-04-01 11:16:53 -0400. Do not edit! */
+/* auto-generated on 2024-04-01 16:00:11 -0400. Do not edit! */
 /* begin file src/simdutf.cpp */
 #include "simdutf.h"
 // We include base64_tables once.
@@ -805,7 +805,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 
@@ -2024,7 +2024,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 
@@ -2247,7 +2247,7 @@ public:
   simdutf_warn_unused virtual result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused virtual size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused virtual result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused virtual size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused virtual size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 
@@ -3194,7 +3194,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 
@@ -4131,7 +4131,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 
@@ -4819,7 +4819,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 private:
   const bool _supports_zvbb;
@@ -5090,7 +5090,7 @@ public:
   simdutf_warn_unused result base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept;
   simdutf_warn_unused size_t maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept;
   simdutf_warn_unused result base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept;
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept;
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept;
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept;
 };
 } // namespace fallback
@@ -5793,8 +5793,10 @@ size_t tail_encode_base64(char *dst, const char *src, size_t srclen, base64_opti
     t1 = uint8_t(src[i]);
     *out++ = e0[t1];
     *out++ = e1[(t1 & 0x03) << 4];
-    *out++ = '=';
-    *out++ = '=';
+    if((options & base64_url) == 0) {
+      *out++ = '=';
+      *out++ = '=';
+    }
     break;
   default: /* case 2 */
     t1 = uint8_t(src[i]);
@@ -5802,7 +5804,9 @@ size_t tail_encode_base64(char *dst, const char *src, size_t srclen, base64_opti
     *out++ = e0[t1];
     *out++ = e1[((t1 & 0x03) << 4) | ((t2 >> 4) & 0x0F)];
     *out++ = e2[(t2 & 0x0F) << 2];
-    *out++ = '=';
+    if((options & base64_url) == 0) {
+      *out++ = '=';
+    }
   }
   return (size_t)(out - dst);
 }
@@ -5827,7 +5831,10 @@ simdutf_warn_unused size_t maximal_binary_length_from_base64(const char_type * i
   return  actual_length / 4 * 3 + (actual_length %4)  - 1;
 }
 
-simdutf_warn_unused size_t base64_length_from_binary(size_t length) noexcept {
+simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) noexcept {
+  if(options & base64_url) {
+    return length/3 * 4 + ((length % 3) ? (length % 3) + 1 : 0);
+  }
   return (length + 2)/3 * 4; // We use padding to make the length a multiple of 4.
 }
 
@@ -6275,8 +6282,8 @@ public:
     return set_best()->base64_to_binary(input, length, output, options);
   }
 
-  simdutf_warn_unused size_t base64_length_from_binary(size_t length) const noexcept override {
-    return set_best()->base64_length_from_binary(length);
+  simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) const noexcept override {
+    return set_best()->base64_length_from_binary(length, options);
   }
 
   size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept override {
@@ -6640,7 +6647,7 @@ public:
   }
 
 
-  simdutf_warn_unused size_t base64_length_from_binary(size_t) const noexcept override {
+  simdutf_warn_unused size_t base64_length_from_binary(size_t, base64_options) const noexcept override {
     return 0;
   }
 
@@ -7120,7 +7127,7 @@ simdutf_warn_unused result base64_to_binary_safe_impl(const chartype * input, si
   }
   // The output buffer is maybe too small. We will decode a truncated version of the input.
   size_t outlen3 = outlen / 3 * 3; // round down to multiple of 3
-  size_t safe_input = base64_length_from_binary(outlen3);
+  size_t safe_input = base64_length_from_binary(outlen3, options);
   result r = base64_to_binary(input, safe_input, output, options);
   if(r.error == error_code::INVALID_BASE64_CHARACTER) { return r; }
   size_t offset = (r.error == error_code::BASE64_INPUT_REMAINDER) ? 1 :
@@ -7163,8 +7170,8 @@ simdutf_warn_unused result base64_to_binary_safe(const char16_t * input, size_t 
   return base64_to_binary_safe_impl<char16_t>(input, length, output, outlen, options);
 }
 
-simdutf_warn_unused size_t base64_length_from_binary(size_t length) noexcept {
-  return get_default_implementation()->base64_length_from_binary(length);
+simdutf_warn_unused size_t base64_length_from_binary(size_t length, base64_options options) noexcept {
+  return get_default_implementation()->base64_length_from_binary(length, options);
 }
 
 size_t binary_to_base64(const char * input, size_t length, char* output, base64_options options) noexcept {
@@ -19420,8 +19427,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return (options & base64_url) ? compress_decode_base64<true>(output, input, length, options) : compress_decode_base64<false>(output, input, length, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -19802,8 +19809,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return scalar::base64::base64_tail_decode(output, input, length, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -24375,8 +24382,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
 }
 
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -29838,8 +29845,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return (options & base64_url) ? compress_decode_base64<true>(output, input, length, options) : compress_decode_base64<false>(output, input, length, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -31406,8 +31413,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return scalar::base64::base64_to_binary(input, length, output, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -32763,8 +32770,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return scalar::base64::base64_tail_decode(output, input, length, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
@@ -38222,8 +38229,8 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   return (options & base64_url) ? compress_decode_base64<true>(output, input, length, options) : compress_decode_base64<false>(output, input, length, options);
 }
 
-simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length) const noexcept {
-  return scalar::base64::base64_length_from_binary(length);
+simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
+  return scalar::base64::base64_length_from_binary(length, options);
 }
 
 size_t implementation::binary_to_base64(const char * input, size_t length, char* output, base64_options options) const noexcept {
