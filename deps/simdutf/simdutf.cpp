@@ -1,4 +1,4 @@
-/* auto-generated on 2024-04-01 23:31:37 -0400. Do not edit! */
+/* auto-generated on 2024-04-02 14:27:21 -0400. Do not edit! */
 /* begin file src/simdutf.cpp */
 #include "simdutf.h"
 // We include base64_tables once.
@@ -7174,17 +7174,26 @@ simdutf_warn_unused result base64_to_binary_safe_impl(const chartype * input, si
   while(tail_length > 0 && scalar::base64::is_ascii_white_space(tail_input[tail_length - 1])) {
     tail_length--;
   }
+  size_t padding_characts = 0;
   if(tail_length > 0 && tail_input[tail_length - 1] == '=') {
     tail_length--;
+    padding_characts++;
     while(tail_length > 0 && scalar::base64::is_ascii_white_space(tail_input[tail_length - 1])) {
       tail_length--;
     }
     if(tail_length > 0 && tail_input[tail_length - 1] == '=') {
       tail_length--;
+      padding_characts++;
     }
   }
   r = scalar::base64::base64_tail_decode_safe(output + output_index, remaining_out, tail_input, tail_length, options);
   outlen = output_index + remaining_out;
+  if(r.error == error_code::SUCCESS && padding_characts > 0) {
+    // additional checks
+    if((outlen % 3 == 0) || ((outlen % 3) + 1 + padding_characts != 4)) {
+      r.error = error_code::INVALID_BASE64_CHARACTER;
+    }
+  }
   r.count += input_index;
   return r;
 }
@@ -17133,7 +17142,18 @@ result compress_decode_base64(char *dst, const char_type *src, size_t srclen,
     } else {
       r.count += size_t(dst - dstinit);
     }
+    if(r.error == error_code::SUCCESS && equalsigns > 0) {
+      // additional checks
+      if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+        r.error = error_code::INVALID_BASE64_CHARACTER;
+      }
+    }
     return r;
+  }
+  if(equalsigns > 0) {
+    if((size_t(dst - dstinit) % 3 == 0) || ((size_t(dst - dstinit) % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, size_t(dst - dstinit)};
+    }
   }
   return {SUCCESS, size_t(dst - dstinit)};
 }
@@ -19817,21 +19837,34 @@ simdutf_warn_unused result implementation::base64_to_binary(const char * input, 
   while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
     length--;
   }
+  size_t equallocation = length; // location of the first padding character if any
+  size_t equalsigns = 0;
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    equalsigns++;
     while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
       length--;
     }
     if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
       length -= 1;
     }
   }
   if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
     return {SUCCESS, 0};
   }
-  return scalar::base64::base64_tail_decode(output, input, length, options);
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
-
 
 simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept {
   return scalar::base64::maximal_binary_length_from_base64(input, length);
@@ -19841,19 +19874,33 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
     length--;
   }
+  size_t equallocation = length; // location of the first padding character if any
+  size_t equalsigns = 0;
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    equalsigns++;
     while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
       length--;
     }
     if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
       length -= 1;
     }
   }
   if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
     return {SUCCESS, 0};
   }
-  return scalar::base64::base64_tail_decode(output, input, length, options);
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
 
 simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
@@ -23087,7 +23134,18 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
     } else {
       r.count += size_t(dst - dstinit);
     }
+    if(r.error == error_code::SUCCESS && equalsigns > 0) {
+      // additional checks
+      if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+        r.error = error_code::INVALID_BASE64_CHARACTER;
+      }
+    }
     return r;
+  }
+  if(equalsigns > 0) {
+    if((size_t(dst - dstinit) % 3 == 0) || ((size_t(dst - dstinit) % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, size_t(dst - dstinit)};
+    }
   }
   return {SUCCESS, size_t(dst - dstinit)};
 }
@@ -27574,7 +27632,18 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
     } else {
       r.count += size_t(dst - dstinit);
     }
+    if(r.error == error_code::SUCCESS && equalsigns > 0) {
+      // additional checks
+      if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+        r.error = error_code::INVALID_BASE64_CHARACTER;
+      }
+    }
     return r;
+  }
+  if(equalsigns > 0) {
+    if((size_t(dst - dstinit) % 3 == 0) || ((size_t(dst - dstinit) % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, size_t(dst - dstinit)};
+    }
   }
   return {SUCCESS, size_t(dst - dstinit)};
 }
@@ -31463,19 +31532,33 @@ simdutf_warn_unused result implementation::base64_to_binary(const char * input, 
   while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
     length--;
   }
+  size_t equallocation = length; // location of the first padding character if any
+  size_t equalsigns = 0;
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    equalsigns++;
     while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
       length--;
     }
     if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
       length -= 1;
     }
   }
   if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};;
+    }
     return {SUCCESS, 0};
   }
-  return scalar::base64::base64_tail_decode(output, input, length, options);
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
 
 simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(const char16_t * input, size_t length) const noexcept {
@@ -31483,7 +31566,37 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept {
-  return scalar::base64::base64_to_binary(input, length, output, options);
+  // skip trailing spaces
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
+  size_t equallocation = length; // location of the first padding character if any
+  size_t equalsigns = 0;
+  if(length > 0 && input[length - 1] == '=') {
+    length -= 1;
+    equalsigns++;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
+    if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
+      length -= 1;
+    }
+  }
+  if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+    return {SUCCESS, 0};
+  }
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
 
 simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
@@ -32816,19 +32929,33 @@ simdutf_warn_unused result implementation::base64_to_binary(const char * input, 
   while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
     length--;
   }
+  size_t equallocation = length; // location of the first padding character if any
+  size_t equalsigns = 0;
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    equalsigns++;
     while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
       length--;
     }
     if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
       length -= 1;
     }
   }
   if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
     return {SUCCESS, 0};
   }
-  return scalar::base64::base64_tail_decode(output, input, length, options);
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
 
 
@@ -32840,19 +32967,33 @@ simdutf_warn_unused result implementation::base64_to_binary(const char16_t * inp
   while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
     length--;
   }
+  size_t equallocation = length; // location of the first padding character if any
+  auto equalsigns = 0;
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    equalsigns++;
     while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
       length--;
     }
     if(length > 0 && input[length - 1] == '=') {
+      equalsigns++;
       length -= 1;
     }
   }
   if(length == 0) {
+    if(equalsigns > 0) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
     return {SUCCESS, 0};
   }
-  return scalar::base64::base64_tail_decode(output, input, length, options);
+  result r = scalar::base64::base64_tail_decode(output, input, length, options);
+  if(r.error == error_code::SUCCESS && equalsigns > 0) {
+    // additional checks
+    if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, equallocation};
+    }
+  }
+  return r;
 }
 
 simdutf_warn_unused size_t implementation::base64_length_from_binary(size_t length, base64_options options) const noexcept {
@@ -35971,7 +36112,18 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
     } else {
       r.count += size_t(dst - dstinit);
     }
+    if(r.error == error_code::SUCCESS && equalsigns > 0) {
+      // additional checks
+      if((r.count % 3 == 0) || ((r.count % 3) + 1 + equalsigns != 4)) {
+        r.error = error_code::INVALID_BASE64_CHARACTER;
+      }
+    }
     return r;
+  }
+  if(equalsigns > 0) {
+    if((size_t(dst - dstinit) % 3 == 0) || ((size_t(dst - dstinit) % 3) + 1 + equalsigns != 4)) {
+      return {INVALID_BASE64_CHARACTER, size_t(dst - dstinit)};
+    }
   }
   return {SUCCESS, size_t(dst - dstinit)};
 }
