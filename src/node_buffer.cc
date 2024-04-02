@@ -706,7 +706,6 @@ start_fill:
 // * -1 indicates a single character remained,
 // * -3 indicates a possible overflow (i.e., more than 2 GB output).
 void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
-
   Environment* env = Environment::GetCurrent(args);
 
   THROW_AND_RETURN_UNLESS_BUFFER(env, args.This());
@@ -727,9 +726,6 @@ void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
 
   THROW_AND_RETURN_IF_OOB(ParseArrayIndex(env, args[2], ts_obj_length - offset,
                                           &max_length));
-
-  max_length = std::min(ts_obj_length - offset, max_length);
-
   if (max_length == 0)
     return args.GetReturnValue().Set(0);
 
@@ -743,7 +739,7 @@ void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
 
   if (str->IsExternalOneByte()) { // 8-bit case
     auto ext = str->GetExternalOneByteStringResource();
-    simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_url);
+    simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_default);
     if(r.error == simdutf::error_code::SUCCESS) {
       written = buflen;
     } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
@@ -755,7 +751,7 @@ void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
     }
   } else { // 16-bit case
     String::Value value(env->isolate(), str);
-    simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_url);
+    simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_default);
     if(r.error == simdutf::error_code::SUCCESS) {
       written = buflen;
     } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
