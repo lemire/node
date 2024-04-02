@@ -699,6 +699,76 @@ start_fill:
   }
 }
 
+// on success: returns a non-negative integer indicating the size of the
+// binary produced, it most be no larger than 2147483647 bytes.
+// In case of error, a negativ value is returned:
+// * -2 indicates an invalid character,
+// * -1 indicates a single character remained,
+// * -3 indicates a possible overflow (i.e., more than 2 GB output).
+void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
+
+  Environment* env = Environment::GetCurrent(args);
+
+  THROW_AND_RETURN_UNLESS_BUFFER(env, args.This());
+  SPREAD_BUFFER_ARG(args.This(), ts_obj);
+
+  THROW_AND_RETURN_IF_NOT_STRING(env, args[0], "argument");
+
+  Local<String> str = args[0]->ToString(env->context()).ToLocalChecked();
+
+  size_t offset = 0;
+  size_t max_length = 0;
+
+  THROW_AND_RETURN_IF_OOB(ParseArrayIndex(env, args[1], 0, &offset));
+  if (offset > ts_obj_length) {
+    return node::THROW_ERR_BUFFER_OUT_OF_BOUNDS(
+        env, "\"offset\" is outside of buffer bounds");
+  }
+
+  THROW_AND_RETURN_IF_OOB(ParseArrayIndex(env, args[2], ts_obj_length - offset,
+                                          &max_length));
+
+  max_length = std::min(ts_obj_length - offset, max_length);
+
+  if (max_length == 0)
+    return args.GetReturnValue().Set(0);
+
+  char* buf = ts_obj_data + offset;
+  size_t buflen = max_length;
+  if(buflen > INT32_MAX) {
+    return args.GetReturnValue().Set(-3);
+  }
+
+  int32_t written{0};
+
+  if (str->IsExternalOneByte()) { // 8-bit case
+    auto ext = str->GetExternalOneByteStringResource();
+    simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_url);
+    if(r.error == simdutf::error_code::SUCCESS) {
+      written = buflen;
+    } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
+      written = -2;
+    } else if(r.error == simdutf::error_code::BASE64_INPUT_REMAINDER) {
+      written = -1;
+    } else {
+      written = -3;
+    }
+  } else { // 16-bit case
+    String::Value value(env->isolate(), str);
+    simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_url);
+    if(r.error == simdutf::error_code::SUCCESS) {
+      written = buflen;
+    } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
+      written = -2;
+    } else if(r.error == simdutf::error_code::BASE64_INPUT_REMAINDER) {
+      written = -1;
+    } else {
+      written = -3;
+    }
+  }
+
+  args.GetReturnValue().Set(written);
+}
 
 template <encoding encoding>
 void StringWrite(const FunctionCallbackInfo<Value>& args) {
@@ -1316,6 +1386,7 @@ void Initialize(Local<Object> target,
 
   SetMethod(context, target, "asciiWrite", StringWrite<ASCII>);
   SetMethod(context, target, "base64Write", StringWrite<BASE64>);
+  SetMethod(context, target, "base64ToBinary", Base64ToBinary);
   SetMethod(context, target, "base64urlWrite", StringWrite<BASE64URL>);
   SetMethod(context, target, "latin1Write", StringWrite<LATIN1>);
   SetMethod(context, target, "hexWrite", StringWrite<HEX>);
@@ -1358,6 +1429,7 @@ void RegisterExternalReferences(ExternalReferenceRegistry* registry) {
   registry->Register(StringSlice<UTF8>);
 
   registry->Register(StringWrite<ASCII>);
+  registry->Register(Base64ToBinary);
   registry->Register(StringWrite<BASE64>);
   registry->Register(StringWrite<BASE64URL>);
   registry->Register(StringWrite<LATIN1>);
