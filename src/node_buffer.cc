@@ -739,9 +739,37 @@ void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
 
   if (str->IsExternalOneByte()) { // 8-bit case
     auto ext = str->GetExternalOneByteStringResource();
+    // We are going to count the number of trailing '=' characters.
+    // Note that this is *inexpensive* in most cases.
+    size_t trailing_equal_signs = 0;
+    size_t extlen = ext->length();
+    auto is_space = [](char c) -> bool {
+      return c == ' ' || c == '\t' || c == '\r' || c == '\n'  || c == '\f';
+    };
+    while(extlen > 0 && is_space(ext->data()[extlen - 1])) {
+      extlen--;
+    }
+    if(extlen > 0 && ext->data()[extlen - 1] == '=') {
+      trailing_equal_signs++;
+      extlen--;
+      while(extlen > 0 && is_space(ext->data()[extlen - 1])) {
+        extlen--;
+      }
+      if(extlen > 0 && ext->data()[extlen - 1] == '=') {
+        trailing_equal_signs++;
+      }
+    }
     simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_default);
     if(r.error == simdutf::error_code::SUCCESS) {
-      written = buflen;
+      if(buflen % 3 == 0 && trailing_equal_signs > 0) {
+        // We have a multiple of 3 bytes and trailing '=' characters.
+        // This is an error in Node.js
+        written = -2;
+      } else if (trailing_equal_signs > 0 && (buflen % 3) + 1 + trailing_equal_signs != 4) {
+        written = -2;
+      } else {
+        written = buflen; // we are ok.
+      }
     } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
       written = -2;
     } else if(r.error == simdutf::error_code::BASE64_INPUT_REMAINDER) {
@@ -751,9 +779,37 @@ void Base64ToBinary(const FunctionCallbackInfo<Value>& args) {
     }
   } else { // 16-bit case
     String::Value value(env->isolate(), str);
+    // We are going to count the number of trailing '=' characters.
+    // Note that this is *inexpensive* in most cases.
+    size_t trailing_equal_signs = 0;
+    size_t extlen = value.length();
+    auto is_space = [](uint16_t c) -> bool {
+      return c == ' ' || c == '\t' || c == '\r' || c == '\n'  || c == '\f';
+    };
+    while(extlen > 0 && is_space((*value)[extlen - 1])) {
+      extlen--;
+    }
+    if(extlen > 0 && (*value)[extlen - 1] == '=') {
+      trailing_equal_signs++;
+      extlen--;
+      while(extlen > 0 && is_space((*value)[extlen - 1])) {
+        extlen--;
+      }
+      if(extlen > 0 && (*value)[extlen - 1] == '=') {
+        trailing_equal_signs++;
+      }
+    }
     simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_default);
     if(r.error == simdutf::error_code::SUCCESS) {
-      written = buflen;
+      if(buflen % 3 == 0 && trailing_equal_signs > 0) {
+        // We have a multiple of 3 bytes and trailing '=' characters.
+        // This is an error when applying the standard strictly.
+        written = -2;
+      } else if (trailing_equal_signs > 0 && (buflen % 3) + 1 + trailing_equal_signs != 4) {
+        written = -2;
+      } else {
+        written = buflen; // we are ok.
+      }
     } else if(r.error == simdutf::error_code::INVALID_BASE64_CHARACTER) {
       written = -2;
     } else if(r.error == simdutf::error_code::BASE64_INPUT_REMAINDER) {

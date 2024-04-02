@@ -1,4 +1,4 @@
-/* auto-generated on 2024-04-01 16:00:11 -0400. Do not edit! */
+/* auto-generated on 2024-04-01 23:31:37 -0400. Do not edit! */
 /* begin file src/simdutf.cpp */
 #include "simdutf.h"
 // We include base64_tables once.
@@ -614,8 +614,8 @@ const unsigned char BitsSetTable256mul2[256] = {
     8,  10, 10, 12, 8,  10, 10, 12, 10, 12, 12, 14, 8,  10, 10, 12, 10, 12, 12,
     14, 10, 12, 12, 14, 12, 14, 14, 16};
 
-const uint8_t to_base64_value[] = {
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 64,  64,  255, 255, 64,  255,
+constexpr uint8_t to_base64_value[] = {
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 64,  64,  255, 64, 64,  255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 64,  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 62,  255,
     255, 255, 63,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  255, 255,
@@ -634,8 +634,8 @@ const uint8_t to_base64_value[] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255};
 
-const uint8_t to_base64_url_value[] = {
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 64,  64,  255, 255, 64,  255,
+constexpr uint8_t to_base64_url_value[] = {
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 64,  64,  255, 64, 64,  255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 64,  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     62,  255, 255, 52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  255, 255,
@@ -653,7 +653,22 @@ const uint8_t to_base64_url_value[] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255};
-
+static_assert(sizeof(to_base64_value) == 256, "to_base64_value must have 256 elements");
+static_assert(sizeof(to_base64_url_value) == 256, "to_base64_url_value must have 256 elements");
+static_assert(to_base64_value[uint8_t(' ')] == 64, "space must be == 64 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t(' ')] == 64, "space must be == 64 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('\t')] == 64, "tab must be == 64 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('\t')] == 64, "tab must be == 64 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('\r')] == 64, "cr must be == 64 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('\r')] == 64, "cr must be == 64 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('\n')] == 64, "lf must be == 64 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('\n')] == 64, "lf must be == 64 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('\f')] == 64, "ff must be == 64 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('\f')] == 64, "ff must be == 64 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('+')] == 62, "+ must be == 62 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('-')] == 62, "- must be == 62 in to_base64_url_value");
+static_assert(to_base64_value[uint8_t('/')] == 63, "/ must be == 62 in to_base64_value");
+static_assert(to_base64_url_value[uint8_t('_')] == 63, "_ must be == 62 in to_base64_url_value");
 } // namespace base64
 } // namespace tables
 } // unnamed namespace
@@ -5561,6 +5576,12 @@ namespace scalar {
 namespace {
 namespace base64 {
 
+// This function is not expected to be fast. Do not use in long loops.
+template <class char_type>
+bool is_ascii_white_space(char_type c) {
+  return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f';
+}
+
 // Returns true upon success. The destination buffer must be large enough.
 // This functions assumes that the padding (=) has been removed.
 template <class char_type>
@@ -7141,7 +7162,7 @@ simdutf_warn_unused result base64_to_binary_safe_impl(const chartype * input, si
   // in between them, so we are not worried about performance.
   while(offset > 0 && input_index > 0) {
     chartype c = input[--input_index];
-    if(c == '=' || c == '\n' || c == '\r' || c == '\t' || c == ' ') {
+    if(scalar::base64::is_ascii_white_space(c)){
       // skipping
     } else {
       offset--;
@@ -7150,8 +7171,14 @@ simdutf_warn_unused result base64_to_binary_safe_impl(const chartype * input, si
   size_t remaining_out = outlen - output_index;
   const chartype * tail_input = input + input_index;
   size_t tail_length = length - input_index;
+  while(tail_length > 0 && scalar::base64::is_ascii_white_space(tail_input[tail_length - 1])) {
+    tail_length--;
+  }
   if(tail_length > 0 && tail_input[tail_length - 1] == '=') {
     tail_length--;
+    while(tail_length > 0 && scalar::base64::is_ascii_white_space(tail_input[tail_length - 1])) {
+      tail_length--;
+    }
     if(tail_length > 0 && tail_input[tail_length - 1] == '=') {
       tail_length--;
     }
@@ -16756,19 +16783,19 @@ template <bool base64_url> uint64_t to_base64_mask(block64 *b, bool *error) {
   if (base64_url) {
     lut_lo =
         simdutf_make_uint8x16_t(0x3a, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-                                0x70, 0x61, 0xe1, 0xf4, 0xf4, 0xa5, 0xf4, 0xf4);
+                                0x70, 0x61, 0xe1, 0xf4, 0xf5, 0xa5, 0xf4, 0xf4);
   } else {
     lut_lo =
         simdutf_make_uint8x16_t(0x3a, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-                                0x70, 0x61, 0xe1, 0xb4, 0xf4, 0xe5, 0xf4, 0xb4);
+                                0x70, 0x61, 0xe1, 0xb4, 0xf5, 0xe5, 0xf4, 0xb4);
   }
 #else
   if (base64_url) {
     lut_lo = uint8x16_t{0x3a, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-              0x70, 0x61, 0xe1, 0xf4, 0xf4, 0xa5, 0xf4, 0xf4};
+              0x70, 0x61, 0xe1, 0xf4, 0xf5, 0xa5, 0xf4, 0xf4};
   } else {
     lut_lo = uint8x16_t{0x3a, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x70,
-              0x70, 0x61, 0xe1, 0xb4, 0xf4, 0xe5, 0xf4, 0xb4};
+              0x70, 0x61, 0xe1, 0xb4, 0xf5, 0xe5, 0xf4, 0xb4};
   }
 #endif
   uint8x16_t lo0 = vqtbl1q_u8(lut_lo, lo_nibbles0);
@@ -16940,10 +16967,18 @@ result compress_decode_base64(char *dst, const char_type *src, size_t srclen,
                               base64_options options) {
   const uint8_t *to_base64 = base64_url ? tables::base64::to_base64_url_value
                                         : tables::base64::to_base64_value;
+  // skip trailing spaces
+  while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+    srclen--;
+  }
   size_t equalsigns = 0;
   if (srclen > 0 && src[srclen - 1] == '=') {
     srclen--;
     equalsigns = 1;
+    // skip trailing spaces
+    while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+      srclen--;
+    }
     if (srclen > 0 && src[srclen - 1] == '=') {
       srclen--;
       equalsigns = 2;
@@ -19779,8 +19814,14 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept {
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
     if(length > 0 && input[length - 1] == '=') {
       length -= 1;
     }
@@ -19797,8 +19838,14 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept {
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
     if(length > 0 && input[length - 1] == '=') {
       length -= 1;
     }
@@ -22775,9 +22822,9 @@ template <bool base64_url>
 static inline uint64_t to_base64_mask(block64 *b, bool *error) {
   __m512i input = b->chunks[0];
   const __m512i ascii_space_tbl = _mm512_set_epi8(
-      0, 0, 13, 0, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 13, 0, 0, 10, 9,
-      0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 13, 0, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0,
-      32, 0, 0, 13, 0, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0, 32);
+      0, 0, 13, 12, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 13, 12, 0, 10, 9,
+      0, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 13, 12, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0,
+      32, 0, 0, 13, 12, 0, 10, 9, 0, 0, 0, 0, 0, 0, 0, 0, 32);
   __m512i lookup0;
   if (base64_url) {
     lookup0 = _mm512_set_epi8(
@@ -22879,9 +22926,17 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
   const uint8_t *to_base64 = base64_url ? tables::base64::to_base64_url_value
                                         : tables::base64::to_base64_value;
   size_t equalsigns = 0;
+  // skip trailing spaces
+  while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+    srclen--;
+  }
   if (srclen > 0 && src[srclen - 1] == '=') {
     srclen--;
     equalsigns = 1;
+    // skip trailing spaces
+    while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+      srclen--;
+    }
     if (srclen > 0 && src[srclen - 1] == '=') {
       srclen--;
       equalsigns = 2;
@@ -27161,8 +27216,8 @@ template <bool base64_url>
 static inline uint32_t to_base64_mask(__m256i *src, bool *error) {
   const __m256i ascii_space_tbl =
       _mm256_setr_epi8(0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0xa,
-                       0x0, 0x0, 0xd, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0,
-                       0x0, 0x0, 0x0, 0x9, 0xa, 0x0, 0x0, 0xd, 0x0, 0x0);
+                       0x0, 0xc, 0xd, 0x0, 0x0, 0x20, 0x0, 0x0, 0x0, 0x0, 0x0,
+                       0x0, 0x0, 0x0, 0x9, 0xa, 0x0, 0xc, 0xd, 0x0, 0x0);
   // credit: aqrit
   __m256i delta_asso;
   if (base64_url) {
@@ -27336,10 +27391,21 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
                               base64_options options) {
   const uint8_t *to_base64 = base64_url ? tables::base64::to_base64_url_value
                                         : tables::base64::to_base64_value;
+  // skip trailing spaces
+  while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+    srclen--;
+  }
   size_t equalsigns = 0;
   if (srclen > 0 && src[srclen - 1] == '=') {
     srclen--;
     equalsigns = 1;
+    // skip trailing spaces
+    while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+      srclen--;
+    }
+    while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+      srclen--;
+    }
     if (srclen > 0 && src[srclen - 1] == '=') {
       srclen--;
       equalsigns = 2;
@@ -31393,8 +31459,15 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept {
+  // skip trailing spaces
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
     if(length > 0 && input[length - 1] == '=') {
       length -= 1;
     }
@@ -32740,8 +32813,14 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char * input, size_t length, char* output, base64_options options) const noexcept {
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
     if(length > 0 && input[length - 1] == '=') {
       length -= 1;
     }
@@ -32758,8 +32837,14 @@ simdutf_warn_unused size_t implementation::maximal_binary_length_from_base64(con
 }
 
 simdutf_warn_unused result implementation::base64_to_binary(const char16_t * input, size_t length, char* output, base64_options options) const noexcept {
+  while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+    length--;
+  }
   if(length > 0 && input[length - 1] == '=') {
     length -= 1;
+    while(length > 0 && scalar::base64::is_ascii_white_space(input[length - 1])) {
+      length--;
+    }
     if(length > 0 && input[length - 1] == '=') {
       length -= 1;
     }
@@ -35526,7 +35611,7 @@ template <bool base64_url>
 static inline uint16_t to_base64_mask(__m128i *src, bool *error) {
   const __m128i ascii_space_tbl =
       _mm_setr_epi8(0x20, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0xa, 0x0,
-                    0x0, 0xd, 0x0, 0x0);
+                    0xc, 0xd, 0x0, 0x0);
   // credit: aqrit
   __m128i delta_asso;
   if (base64_url) {
@@ -35705,10 +35790,18 @@ result compress_decode_base64(char *dst, const chartype *src, size_t srclen,
                               base64_options options) {
   const uint8_t *to_base64 = base64_url ? tables::base64::to_base64_url_value
                                         : tables::base64::to_base64_value;
+  // skip trailing spaces
+  while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+    srclen--;
+  }
   size_t equalsigns = 0;
   if (srclen > 0 && src[srclen - 1] == '=') {
     srclen--;
     equalsigns = 1;
+    // skip trailing spaces
+    while (srclen > 0 && to_base64[uint8_t(src[srclen - 1])] == 64) {
+      srclen--;
+    }
     if (srclen > 0 && src[srclen - 1] == '=') {
       srclen--;
       equalsigns = 2;
