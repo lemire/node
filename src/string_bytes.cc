@@ -346,14 +346,53 @@ size_t StringBytes::Write(Isolate* isolate,
     }
 
     case BASE64URL:
-      // Fall through
-    case BASE64:
-      if (str->IsExternalOneByte()) {
+      if (str->IsExternalOneByte()) { // 8-bit case
         auto ext = str->GetExternalOneByteStringResource();
-        nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
-      } else {
+        // Try with WHATWG base64 standard first, adapted for base64url
+        simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_url);
+        if(r.error == simdutf::error_code::SUCCESS) {
+          nbytes = buflen;
+        } else {
+          // The input does not follow the WHATWG forgiving-base64 specification adapted for base64url
+          // https://infra.spec.whatwg.org/#forgiving-base64-decode
+          nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
+        }
+      } else { // 16-bit case
         String::Value value(isolate, str);
-        nbytes = base64_decode(buf, buflen, *value, value.length());
+        // Try with WHATWG base64 standard first
+        simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_url);
+        if(r.error == simdutf::error_code::SUCCESS) {
+          nbytes = buflen;
+        } else {
+          // The input does not follow the WHATWG forgiving-base64 specification (adapted for base64url with + and / replaced by - and _)
+          // https://infra.spec.whatwg.org/#forgiving-base64-decode
+          nbytes = base64_decode(buf, buflen, *value, value.length());
+        }
+      }
+      break;
+    case BASE64:
+      if (str->IsExternalOneByte()) { // 8-bit case
+        auto ext = str->GetExternalOneByteStringResource();
+        // Try with WHATWG base64 standard first
+        simdutf::result r = simdutf::base64_to_binary_safe(ext->data(), ext->length(), buf, buflen, simdutf::base64_default);
+        if(r.error == simdutf::error_code::SUCCESS) {
+          nbytes = buflen;
+        } else {
+          // The input does not follow the WHATWG forgiving-base64 specification
+          // https://infra.spec.whatwg.org/#forgiving-base64-decode
+          nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
+        }
+      } else { // 16-bit case
+        String::Value value(isolate, str);
+        // Try with WHATWG base64 standard first
+        simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_default);
+        if(r.error == simdutf::error_code::SUCCESS) {
+          nbytes = buflen;
+        } else {
+          // The input does not follow the WHATWG base64 specification
+          // https://infra.spec.whatwg.org/#forgiving-base64-decode
+          nbytes = base64_decode(buf, buflen, *value, value.length());
+        }
       }
       break;
 
@@ -626,7 +665,7 @@ MaybeLocal<Value> StringBytes::Encode(Isolate* isolate,
     case BASE64URL: {
       // When in URL mode, base64_encode uses a non-accelerated routine, so we
       // adopt simdutf.
-      size_t dlen = simdutf::base64_length_from_binary(buflen);
+      size_t dlen = simdutf::base64_length_from_binary(buflen, simdutf::base64_url);
       char* dst = node::UncheckedMalloc(dlen);
       if (dst == nullptr) {
         *error = node::ERR_MEMORY_ALLOCATION_FAILED(isolate);
