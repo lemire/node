@@ -358,13 +358,18 @@ size_t StringBytes::Write(Isolate* isolate,
           nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
         }
       } else { // 16-bit case
+        // Typically, a base64url string is stored as an 8-bit string within v8.
+        // Thus str->IsOneByte() is typically true. The next line thus often allocates
+        // a temporary 16-bit buffer to store a 16-bit copy of the 8-bit v8 string.
+        // Hence the creation of the String::Value value is likely a performance bottleneck.
         String::Value value(isolate, str);
         // Try with WHATWG base64 standard first
         simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_url);
         if(r.error == simdutf::error_code::SUCCESS) {
           nbytes = buflen;
         } else {
-          // The input does not follow the WHATWG forgiving-base64 specification (adapted for base64url with + and / replaced by - and _)
+          // The input does not follow the WHATWG forgiving-base64 specification
+          // (adapted for base64url with + and / replaced by - and _).
           // https://infra.spec.whatwg.org/#forgiving-base64-decode
           nbytes = base64_decode(buf, buflen, *value, value.length());
         }
@@ -383,6 +388,10 @@ size_t StringBytes::Write(Isolate* isolate,
           nbytes = base64_decode(buf, buflen, ext->data(), ext->length());
         }
       } else { // 16-bit case
+        // Typically, a base64 string is stored as an 8-bit string within v8.
+        // Thus str->IsOneByte() is typically true. The next line thus often allocates
+        // a temporary 16-bit buffer to store a 16-bit copy of the 8-bit v8 string.
+        // Hence the creation of the String::Value value is likely a performance bottleneck.
         String::Value value(isolate, str);
         // Try with WHATWG base64 standard first
         simdutf::result r = simdutf::base64_to_binary_safe(reinterpret_cast<const char16_t*>(*value), value.length(), buf, buflen, simdutf::base64_default);
