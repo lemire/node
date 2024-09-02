@@ -1275,11 +1275,14 @@ static void Btoa(const FunctionCallbackInfo<Value>& args) {
   size_t written;
 
   if (input_view.is_one_byte()) {  // 8-bit case
-    size_t expected_length = simdutf::base64_length_from_binary(input_view.length());
+    size_t expected_length =
+        simdutf::base64_length_from_binary(input_view.length());
     buffer.AllocateSufficientStorage(expected_length + 1);
     buffer.SetLengthAndZeroTerminate(expected_length);
-    written =
-        simdutf::binary_to_base64(reinterpret_cast<const char*>(input_view.data8()), input_view.length(), buffer.out());
+    written = simdutf::binary_to_base64(
+        reinterpret_cast<const char*>(input_view.data8()),
+        input_view.length(),
+        buffer.out());
   } else {
     String::Value value(env->isolate(), input);
     MaybeStackBuffer<char> stack_buf(value.length());
@@ -1322,12 +1325,15 @@ static void Atob(const FunctionCallbackInfo<Value>& args) {
   simdutf::result result;
 
   if (input_view.is_one_byte()) {  // 8-bit case
-    size_t expected_length =
-        simdutf::maximal_binary_length_from_base64(reinterpret_cast<const char*>(input_view.data8()), input_view.length());
+    size_t expected_length = simdutf::maximal_binary_length_from_base64(
+        reinterpret_cast<const char*>(input_view.data8()), input_view.length());
     buffer.AllocateSufficientStorage(expected_length);
     buffer.SetLength(expected_length);
     result = simdutf::base64_to_binary(
-        reinterpret_cast<const char*>(input_view.data8()), input_view.length(), buffer.out(), simdutf::base64_default);
+        reinterpret_cast<const char*>(input_view.data8()),
+        input_view.length(),
+        buffer.out(),
+        simdutf::base64_default);
   } else {  // 16-bit case
     String::Value value(env->isolate(), input);
     auto data = reinterpret_cast<const char16_t*>(*value);

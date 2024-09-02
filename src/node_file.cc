@@ -2422,7 +2422,8 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
       len = input_view.length();
     } else if (enc == UCS2 && !input_view.is_one_byte()) {
       if constexpr (IsLittleEndian()) {
-        buf = reinterpret_cast<char*>(const_cast<uint16_t*>(input_view.data16()));
+        buf =
+            reinterpret_cast<char*>(const_cast<uint16_t*>(input_view.data16()));
         len = input_view.length() * sizeof(uint16_t);
       }
     }
