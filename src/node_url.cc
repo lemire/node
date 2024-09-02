@@ -247,11 +247,14 @@ void BindingData::Parse(const FunctionCallbackInfo<Value>& args) {
   const bool raise_exception = args.Length() > 2 && args[2]->IsTrue();
 
   BindingData* binding_data = realm->GetBindingData<BindingData>();
-  auto parse_fnc = [isolate](Local<String> &&str, ada::url_aggregator* base_pointer = nullptr) {
+  auto parse_fnc = [isolate](Local<String>&& str,
+                             ada::url_aggregator* base_pointer = nullptr) {
     String::ValueView view(isolate, str);
-    if (view.is_one_byte()) { // URLs are usually ASCII
-      if(simdutf::validate_ascii(reinterpret_cast<const char*>(view.data8()), view.length())) {
-        std::string_view str_view(reinterpret_cast<const char*>(view.data8()), view.length());
+    if (view.is_one_byte()) {  // URLs are usually ASCII
+      if (simdutf::validate_ascii(reinterpret_cast<const char*>(view.data8()),
+                                  view.length())) {
+        std::string_view str_view(reinterpret_cast<const char*>(view.data8()),
+                                  view.length());
         return ada::parse<ada::url_aggregator>(str_view, base_pointer);
       }
     }
