@@ -2407,7 +2407,7 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
   FSReqBase* req_wrap_async = GetReqWrap(args, 4);
   const bool is_async = req_wrap_async != nullptr;
 
-  // Avoid copying the string when it is externalized but only when:
+  // Avoid copying the string but only when:
   // 1. The target encoding is compatible with the string's encoding, and
   // 2. The write is synchronous, otherwise the string might get neutered
   //    while the request is in flight, and
@@ -2416,15 +2416,14 @@ static void WriteString(const FunctionCallbackInfo<Value>& args) {
   // The const_casts are conceptually sound: memory is read but not written.
   if (!is_async && value->IsString()) {
     auto string = value.As<String>();
-    if ((enc == ASCII || enc == LATIN1) && string->IsExternalOneByte()) {
-      auto ext = string->GetExternalOneByteStringResource();
-      buf = const_cast<char*>(ext->data());
-      len = ext->length();
-    } else if (enc == UCS2 && string->IsExternalTwoByte()) {
+    String::ValueView input_view(isolate, string);
+    if ((enc == ASCII || enc == LATIN1) && input_view.is_one_byte()) {
+      buf = reinterpret_cast<char*>(const_cast<uint8_t*>(input_view.data8()));
+      len = input_view.length();
+    } else if (enc == UCS2 && !input_view.is_one_byte()) {
       if constexpr (IsLittleEndian()) {
-        auto ext = string->GetExternalStringResource();
-        buf = reinterpret_cast<char*>(const_cast<uint16_t*>(ext->data()));
-        len = ext->length() * sizeof(*ext->data());
+        buf = reinterpret_cast<char*>(const_cast<uint16_t*>(input_view.data16()));
+        len = input_view.length() * sizeof(uint16_t);
       }
     }
   }
