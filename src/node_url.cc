@@ -8,13 +8,16 @@
 #include "node_metadata.h"
 #include "node_process-inl.h"
 #include "path.h"
+#include "simdutf.h"
 #include "util-inl.h"
 #include "v8-fast-api-calls.h"
 #include "v8.h"
 
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <numeric>
+#include <string>
 
 namespace node {
 namespace url {
@@ -235,35 +238,72 @@ void BindingData::Format(const FunctionCallbackInfo<Value>& args) {
 
 void BindingData::Parse(const FunctionCallbackInfo<Value>& args) {
   CHECK_GE(args.Length(), 1);
-  CHECK(args[0]->IsString());  // input
+  Realm* realm = Realm::GetCurrent(args);
+  Isolate* isolate = realm->isolate();
+  Local<String> str; // input
+  CHECK(args[0]->ToString(isolate->GetCurrentContext()).ToLocal(&str));
   // args[1] // base url
   // args[2] // raise Exception
 
   const bool raise_exception = args.Length() > 2 && args[2]->IsTrue();
 
-  Realm* realm = Realm::GetCurrent(args);
   BindingData* binding_data = realm->GetBindingData<BindingData>();
-  Isolate* isolate = realm->isolate();
-  std::optional<std::string> base_{};
+  std::optional<std::string_view> base_{};
 
-  Utf8Value input(isolate, args[0]);
+  bool is_ascii = false;
+  String::ValueView view(isolate, str);
+  if (view.is_one_byte()) { // URLs are usually ASCII
+    is_ascii = simdutf::validate_ascii(reinterpret_cast<const char*>(view.data8()), view.length());
+  }
+  // most of the time, is_ascii will be true
+  std::unique_ptr<Utf8Value> utf8_value;
+  std::string_view str_view;
+  if (is_ascii) {
+    str_view = std::string_view(reinterpret_cast<const char*>(view.data8()), view.length());
+  } else {
+    // We only do the conversion to UTF-8 if the string is not ASCII (slow path)
+    utf8_value = std::make_unique<Utf8Value>(isolate, str);
+    str_view = utf8_value->ToStringView();
+  }
   ada::result<ada::url_aggregator> base;
   ada::url_aggregator* base_pointer = nullptr;
+  std::unique_ptr<Utf8Value> base_utf8_value;
   if (args[1]->IsString()) {
-    base_ = Utf8Value(isolate, args[1]).ToString();
+    Local<String> base_str;
+    CHECK(args[1]->ToString(isolate->GetCurrentContext()).ToLocal(&base_str));
+    bool is_base_ascii = false;
+    String::ValueView base_view(isolate, base_str);
+    if (base_view.is_one_byte()) { // URLs are usually ASCII
+      is_base_ascii = simdutf::validate_ascii(reinterpret_cast<const char*>(base_view.data8()), base_view.length());
+    }
+    if (is_base_ascii) {
+      base_ = std::string_view(reinterpret_cast<const char*>(base_view.data8()), base_view.length());
+    } else {
+      // We only do the conversion to UTF-8 if the string is not ASCII (slow path)
+      base_utf8_value = std::make_unique<Utf8Value>(isolate, base_str);
+      base_ = base_utf8_value->ToStringView();
+    }
     base = ada::parse<ada::url_aggregator>(*base_);
     if (!base && raise_exception) {
-      return ThrowInvalidURL(realm->env(), input.ToStringView(), base_);
+      std::optional<std::string> base_opt;
+      if (base_) {
+        base_opt = base_;
+      }
+      return ThrowInvalidURL(realm->env(), str_view, base_opt);
     } else if (!base) {
       return;
     }
     base_pointer = &base.value();
   }
   auto out =
-      ada::parse<ada::url_aggregator>(input.ToStringView(), base_pointer);
+      ada::parse<ada::url_aggregator>(str_view, base_pointer);
 
   if (!out && raise_exception) {
-    return ThrowInvalidURL(realm->env(), input.ToStringView(), base_);
+    std::optional<std::string> base_opt;
+    if (base_) {
+      base_opt = base_;
+    }
+    return ThrowInvalidURL(realm->env(), str_view, base_opt);
   } else if (!out) {
     return;
   }
