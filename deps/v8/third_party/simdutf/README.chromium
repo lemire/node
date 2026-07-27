@@ -2,8 +2,8 @@ Name: simdutf unicode transcoder
 Short Name: simdutf
 URL: https://github.com/simdutf/simdutf
 Update Mechanism: Manual
-Revision: da645ece
-Version: 7.7.0
+Revision: 6ad40918
+Version: 9.0.0
 License: MIT
 License File: LICENSE
 Shipped: yes
@@ -27,3 +27,10 @@ a memory-safe alternative should be used.
 Note: This is using the single header version of the library. To update it,
 download the single-header file from their released page, and replace the
 files in this directory.
+
+Local modification: SIMDUTF_FEATURE_NORMALIZATION defaults to 1 in simdutf.h
+(upstream default is 0) so that String.prototype.normalize can use simdutf.
+The normalization tables add roughly 430 kB to the binary.
+
+This copy is built from https://github.com/simdutf/simdutf/pull/999, which is
+where the normalization support lives until it is released.

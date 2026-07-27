@@ -1086,6 +1086,8 @@ DEFINE_BOOL_READONLY(internalize_on_the_fly, true,
 // Flags for data representation optimizations
 DEFINE_BOOL(unbox_double_arrays, true, "automatically unbox arrays of doubles")
 DEFINE_BOOL_READONLY(string_slices, true, "use string slices")
+DEFINE_BOOL(simdutf_normalize, true,
+            "use simdutf instead of ICU for String.prototype.normalize")
 
 // Tiering: Sparkplug / feedback vector allocation.
 DEFINE_INT(invocation_count_for_feedback_allocation, 8,

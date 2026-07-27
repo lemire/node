@@ -14,11 +14,14 @@
 
 #include "src/api/api-inl.h"
 #include "src/base/logging.h"
+#include "src/base/small-vector.h"
 #include "src/base/strings.h"
+#include "src/base/vector.h"
 #include "src/common/globals.h"
 #include "src/date/date.h"
 #include "src/execution/isolate.h"
 #include "src/execution/local-isolate.h"
+#include "src/flags/flags.h"
 #include "src/handles/global-handles.h"
 #include "src/heap/factory.h"
 #include "src/objects/js-collator-inl.h"
@@ -34,8 +37,10 @@
 #include "src/objects/option-utils.h"
 #include "src/objects/property-descriptor.h"
 #include "src/objects/smi.h"
+#include "src/objects/string-inl.h"
 #include "src/objects/string.h"
 #include "src/strings/string-case.h"
+#include "third_party/simdutf/simdutf.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wshadow"
 #include "unicode/basictz.h"
@@ -2630,16 +2635,123 @@ DirectHandle<Managed<icu::UnicodeString>> Intl::SetTextToBreakIterator(
   return new_u_text;
 }
 
+namespace {
+
+enum class NormalizationForm { kNfc, kNfd, kNfkc, kNfkd };
+
+#ifdef V8_TARGET_LITTLE_ENDIAN
+bool SimdutfNormalizeCheck(NormalizationForm form, const char16_t* input,
+                           size_t length, size_t* output_length) {
+  switch (form) {
+    case NormalizationForm::kNfc:
+      return simdutf::normalize_utf16le_to_nfc_check(input, length,
+                                                     output_length);
+    case NormalizationForm::kNfd:
+      return simdutf::normalize_utf16le_to_nfd_check(input, length,
+                                                     output_length);
+    case NormalizationForm::kNfkc:
+      return simdutf::normalize_utf16le_to_nfkc_check(input, length,
+                                                      output_length);
+    case NormalizationForm::kNfkd:
+      return simdutf::normalize_utf16le_to_nfkd_check(input, length,
+                                                      output_length);
+  }
+  UNREACHABLE();
+}
+
+size_t SimdutfNormalizeInto(NormalizationForm form, const char16_t* input,
+                            size_t length, char16_t* output) {
+  switch (form) {
+    case NormalizationForm::kNfc:
+      return simdutf::normalize_utf16le_to_nfc(input, length, output);
+    case NormalizationForm::kNfd:
+      return simdutf::normalize_utf16le_to_nfd(input, length, output);
+    case NormalizationForm::kNfkc:
+      return simdutf::normalize_utf16le_to_nfkc(input, length, output);
+    case NormalizationForm::kNfkd:
+      return simdutf::normalize_utf16le_to_nfkd(input, length, output);
+  }
+  UNREACHABLE();
+}
+
+// Normalizes |string| with simdutf, which is usually quite a bit faster than
+// ICU. Stores the result in |out| and returns true on success. Returns false
+// when simdutf cannot handle the input, in which case the caller falls back to
+// ICU.
+V8_WARN_UNUSED_RESULT bool TryNormalizeWithSimdutf(
+    Isolate* isolate, DirectHandle<String> string, NormalizationForm form,
+    MaybeDirectHandle<String>* out) {
+  const uint32_t length = string->length();
+  // simdutf normalizes UTF-16, so one-byte strings have to be widened first.
+  base::SmallVector<base::uc16, 128> widened;
+  base::SmallVector<base::uc16, 128> buffer;
+  size_t written = 0;
+  bool already_normalized;
+  {
+    DisallowGarbageCollection no_gc;
+    String::FlatContent flat = string->GetFlatContent(no_gc);
+    if (!flat.IsFlat()) return false;
+    const char16_t* input;
+    if (flat.IsOneByte()) {
+      base::Vector<const uint8_t> vec = flat.ToOneByteVector();
+      widened.resize_no_init(length);
+      input = reinterpret_cast<const char16_t*>(widened.data());
+      simdutf::convert_latin1_to_utf16le(
+          reinterpret_cast<const char*>(vec.begin()), length,
+          const_cast<char16_t*>(input));
+    } else {
+      input = reinterpret_cast<const char16_t*>(flat.ToUC16Vector().begin());
+      // The simdutf normalizers assume well-formed UTF-16 and report no
+      // errors, so strings holding lone surrogates are left to ICU.
+      if (!simdutf::validate_utf16(input, length)) return false;
+    }
+    // The check tells us whether the string is already in the requested form,
+    // and always writes an upper bound on the output length.
+    size_t output_length = 0;
+    already_normalized =
+        SimdutfNormalizeCheck(form, input, length, &output_length);
+    if (!already_normalized) {
+      if (output_length > String::kMaxLength) return false;
+      buffer.resize_no_init(output_length);
+      written =
+          SimdutfNormalizeInto(form, input, length,
+                               reinterpret_cast<char16_t*>(buffer.data()));
+      DCHECK_LE(written, output_length);
+    }
+  }
+  if (already_normalized) {
+    *out = string;
+    return true;
+  }
+  // NewStringFromTwoByte picks a one-byte representation when it can, which is
+  // what the ICU path below does as well.
+  Handle<String> result;
+  if (!isolate->factory()
+           ->NewStringFromTwoByte(base::VectorOf(buffer.data(), written))
+           .ToHandle(&result)) {
+    // The exception is already pending.
+    *out = MaybeDirectHandle<String>();
+    return true;
+  }
+  *out = result;
+  return true;
+}
+#endif  // V8_TARGET_LITTLE_ENDIAN
+
+}  // namespace
+
 // ecma262 #sec-string.prototype.normalize
 MaybeDirectHandle<String> Intl::Normalize(Isolate* isolate,
                                           DirectHandle<String> string,
                                           DirectHandle<Object> form_input) {
   const char* form_name;
   UNormalization2Mode form_mode;
+  NormalizationForm form_id;
   if (IsUndefined(*form_input, isolate)) {
     // default is FNC
     form_name = "nfc";
     form_mode = UNORM2_COMPOSE;
+    form_id = NormalizationForm::kNfc;
   } else {
     DirectHandle<String> form;
     ASSIGN_RETURN_ON_EXCEPTION(isolate, form,
@@ -2648,18 +2760,22 @@ MaybeDirectHandle<String> Intl::Normalize(Isolate* isolate,
     if (String::Equals(isolate, form, isolate->factory()->NFC_string())) {
       form_name = "nfc";
       form_mode = UNORM2_COMPOSE;
+      form_id = NormalizationForm::kNfc;
     } else if (String::Equals(isolate, form,
                               isolate->factory()->NFD_string())) {
       form_name = "nfc";
       form_mode = UNORM2_DECOMPOSE;
+      form_id = NormalizationForm::kNfd;
     } else if (String::Equals(isolate, form,
                               isolate->factory()->NFKC_string())) {
       form_name = "nfkc";
       form_mode = UNORM2_COMPOSE;
+      form_id = NormalizationForm::kNfkc;
     } else if (String::Equals(isolate, form,
                               isolate->factory()->NFKD_string())) {
       form_name = "nfkc";
       form_mode = UNORM2_DECOMPOSE;
+      form_id = NormalizationForm::kNfkd;
     } else {
       DirectHandle<String> valid_forms =
           isolate->factory()->NewStringFromStaticChars("NFC, NFD, NFKC, NFKD");
@@ -2671,6 +2787,18 @@ MaybeDirectHandle<String> Intl::Normalize(Isolate* isolate,
 
   int32_t length = to_icu_length(string->length());
   string = String::Flatten(isolate, string);
+
+#ifdef V8_TARGET_LITTLE_ENDIAN
+  if (v8_flags.simdutf_normalize) {
+    MaybeDirectHandle<String> result;
+    if (TryNormalizeWithSimdutf(isolate, string, form_id, &result)) {
+      return result;
+    }
+  }
+#else
+  USE(form_id);
+#endif  // V8_TARGET_LITTLE_ENDIAN
+
   icu::UnicodeString result;
   std::unique_ptr<base::uc16[]> sap;
   UErrorCode status = U_ZERO_ERROR;
