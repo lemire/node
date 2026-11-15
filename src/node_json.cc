@@ -230,23 +230,38 @@ Tape CopyTape(const simdjson::dom::document& doc) {
   return t;
 }
 
+// Creates a V8 string from UTF-8, throwing ERR_STRING_TOO_LONG when the
+// bytes exceed V8's limit (which also keeps the length within int).
+MaybeLocal<String> Utf8ToJS(Isolate* isolate,
+                            std::string_view s,
+                            NewStringType type) {
+  if (s.size() > static_cast<size_t>(String::kMaxLength)) {
+    isolate->ThrowException(ERR_STRING_TOO_LONG(isolate));
+    return MaybeLocal<String>();
+  }
+  return String::NewFromUtf8(
+      isolate, s.data(), type, static_cast<int>(s.size()));
+}
+
+// Converts a 'Z' entry: digits beyond 64 bits. simdjson validated them, so
+// from_chars cannot fail; it rounds correctly and gives Infinity past the
+// double range, as JSON.parse does.
+double TapeBigInt(const uint64_t* tape, const uint8_t* strings, size_t i) {
+  std::string_view digits = TapeString(tape, strings, i);
+  double d = 0;
+  fast_float::from_chars(digits.data(), digits.data() + digits.size(), d);
+  return d;
+}
+
 // Converts a scalar tape entry (not '{' or '[') to a JavaScript value.
 MaybeLocal<Value> ScalarToJS(Isolate* isolate,
                              const uint64_t* tape,
                              const uint8_t* strings,
                              size_t i) {
   switch (TapeType(tape, i)) {
-    case '"': {
-      std::string_view s = TapeString(tape, strings, i);
-      if (s.size() > static_cast<size_t>(String::kMaxLength)) {
-        isolate->ThrowException(ERR_STRING_TOO_LONG(isolate));
-        return MaybeLocal<Value>();
-      }
-      return String::NewFromUtf8(isolate,
-                                 s.data(),
-                                 NewStringType::kNormal,
-                                 static_cast<int>(s.size()));
-    }
+    case '"':
+      return Utf8ToJS(
+          isolate, TapeString(tape, strings, i), NewStringType::kNormal);
     case 'l':
       return Number::New(isolate, static_cast<double>(TapeInt64(tape, i)));
     case 'u': {
@@ -256,14 +271,8 @@ MaybeLocal<Value> ScalarToJS(Isolate* isolate,
     }
     case 'd':
       return Number::New(isolate, TapeDouble(tape, i));
-    case 'Z': {
-      // Digits only (simdjson validated them), so from_chars cannot fail;
-      // it rounds correctly, as JSON.parse does.
-      std::string_view digits = TapeString(tape, strings, i);
-      double d = 0;
-      fast_float::from_chars(digits.data(), digits.data() + digits.size(), d);
-      return Number::New(isolate, d);
-    }
+    case 'Z':
+      return Number::New(isolate, TapeBigInt(tape, strings, i));
     case 't':
       return Boolean::New(isolate, true);
     case 'f':
@@ -276,10 +285,7 @@ MaybeLocal<Value> ScalarToJS(Isolate* isolate,
 }
 
 MaybeLocal<String> KeyToJS(Isolate* isolate, std::string_view key) {
-  return String::NewFromUtf8(isolate,
-                             key.data(),
-                             NewStringType::kInternalized,
-                             static_cast<int>(key.size()));
+  return Utf8ToJS(isolate, key, NewStringType::kInternalized);
 }
 
 // Eagerly converts the value at tape index i, as JSON.parse would.
@@ -828,7 +834,7 @@ void CompileSchema(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(wrap);
 }
 
-const char* KindName(const uint64_t* tape, size_t i) {
+const char* KindName(const uint64_t* tape, const uint8_t* strings, size_t i) {
   switch (TapeType(tape, i)) {
     case '{':
       return "object";
@@ -838,8 +844,9 @@ const char* KindName(const uint64_t* tape, size_t i) {
       return "string";
     case 'l':
     case 'u':
-    case 'Z':
       return "integer";
+    case 'Z':
+      return std::isfinite(TapeBigInt(tape, strings, i)) ? "integer" : "number";
     case 'd':
       return "number";
     case 't':
@@ -900,8 +907,13 @@ class Decoder {
         break;
       case 'l':
       case 'u':
-      case 'Z':
         bit = kInteger;
+        break;
+      case 'Z':
+        // Past the double range it becomes Infinity: not an integer.
+        bit = std::isfinite(TapeBigInt(tape_, strings_, i))
+                  ? (kNumber | kInteger)
+                  : kNumber;
         break;
       case 'd': {
         double d = TapeDouble(tape_, i);
@@ -919,7 +931,7 @@ class Decoder {
     }
     if (!(node.mask & bit)) {
       return Fail("Expected " + MaskNames(node.mask) + ", got " +
-                  KindName(tape_, i));
+                  KindName(tape_, strings_, i));
     }
     MaybeLocal<Value> result;
     if (type == '{' && node.has_properties) {
@@ -964,6 +976,8 @@ class Decoder {
     Local<Value> stored = node.defaults[k].Get(isolate_);
     if (node.default_kinds[k] == kValueDefault) return stored;
     // Objects and arrays are re-created for each use, like a default factory.
+    // lib/json.js stores them as JSON text it produced and checked.
+    CHECK(stored->IsString());
     return v8::JSON::Parse(context_, stored.As<String>());
   }
 
@@ -971,8 +985,17 @@ class Decoder {
     const size_t count = node.keys.size();
     const size_t base = slots_.size();
     slots_.resize(base + count);
+    positions_.resize(base + count, 0);
+    auto unwind = [&]() {
+      slots_.resize(base);
+      positions_.resize(base);
+      return MaybeLocal<Value>();
+    };
     LocalVector<Value> extra(isolate_);  // additional properties: key, value
     const size_t end = AfterScope(tape_, i) - 1;
+    // First pass: find where each declared property's value is. With
+    // duplicate keys the last one wins, as in JSON.parse, so an earlier
+    // duplicate is never decoded (or reported).
     size_t hint = 0;
     for (size_t j = i + 1; j < end; j = AfterElement(tape_, j + 1)) {
       std::string_view key = TapeString(tape_, strings_, j);
@@ -988,31 +1011,31 @@ class Decoder {
           }
         }
       }
-      if (k == count) {
-        if (node.additional) {
-          Local<String> js_key;
-          Local<Value> value;
-          if (!KeyToJS(isolate_, key).ToLocal(&js_key) ||
-              !ToJS(isolate_, context_, tape_, strings_, j + 1)
-                   .ToLocal(&value)) {
-            slots_.resize(base);
-            return MaybeLocal<Value>();
-          }
-          extra.push_back(js_key);
-          extra.push_back(value);
+      if (k < count) {
+        hint = k + 1;
+        positions_[base + k] = j + 1;
+      } else if (node.additional) {
+        Local<String> js_key;
+        Local<Value> value;
+        if (!KeyToJS(isolate_, key).ToLocal(&js_key) ||
+            !ToJS(isolate_, context_, tape_, strings_, j + 1).ToLocal(&value)) {
+          return unwind();
         }
-        continue;
+        extra.push_back(js_key);
+        extra.push_back(value);
       }
-      hint = k + 1;
-      path_.push_back({key, -1});
-      MaybeLocal<Value> value = Decode(j + 1, node.props[k]);
+    }
+    // Second pass: decode the values, in schema order.
+    for (size_t k = 0; k < count; k++) {
+      const size_t at = positions_[base + k];
+      if (at == 0) continue;
+      path_.push_back({node.keys[k], -1});
+      MaybeLocal<Value> value = Decode(at, node.props[k]);
       path_.pop_back();
-      if (value.IsEmpty()) {
-        slots_.resize(base);
-        return MaybeLocal<Value>();
-      }
+      if (value.IsEmpty()) return unwind();
       slots_[base + k] = value;
     }
+    positions_.resize(base);
     for (size_t k = 0; k < count; k++) {
       if (!slots_[base + k].IsEmpty()) continue;
       if (node.default_kinds[k] != kNoDefault) {
@@ -1080,19 +1103,25 @@ class Decoder {
   // Property values of the objects being built, one window per nesting
   // level. Handles stay valid: they live in the caller's HandleScope.
   std::vector<MaybeLocal<Value>> slots_;
+  // Tape index of each declared property's value (0: absent), same windows.
+  std::vector<size_t> positions_;
   std::vector<PathSegment> path_;
 };
 
-// decode(input, plan)
+// decode(input, plan[, node]): `node` (default 0, the root) lets lib/json.js
+// check a default value against its property's schema.
 void Decode(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
   SchemaPlan* plan;
   ASSIGN_OR_RETURN_UNWRAP(&plan, args[1]);
+  int32_t start = 0;
+  if (args[2]->IsInt32()) start = args[2].As<Int32>()->Value();
+  CHECK(start >= 0 && static_cast<size_t>(start) < plan->nodes.size());
   simdjson::dom::document* doc;
   if (!ParseInput(env, args[0], &doc)) return;
   Decoder decoder(env, plan, *doc);
   Local<Value> result;
-  if (decoder.Decode(1, 0).ToLocal(&result)) {
+  if (decoder.Decode(1, start).ToLocal(&result)) {
     args.GetReturnValue().Set(result);
   }
 }

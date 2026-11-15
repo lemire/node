@@ -37,6 +37,15 @@ Both functions accept a string, a {Buffer}, a {TypedArray}, a {DataView} or an
 string requires, so it suits data read from files or sockets. Invalid JSON
 throws a {SyntaxError}.
 
+Values are converted as `JSON.parse()` converts them, including `-0` and
+integers too large for 64 bits, with these differences:
+
+* A string holding an unpaired surrogate escape, such as `"\uD800"`, is a
+  {SyntaxError}. `JSON.parse()` returns a string with a lone surrogate.
+* A number whose exponent exceeds the range of a double, such as `1e309`, is a
+  {SyntaxError}. `JSON.parse()` returns `Infinity`.
+* A leading UTF-8 byte order mark is skipped. `JSON.parse()` rejects it.
+
 ## `json.parse(input)`
 
 <!-- YAML
@@ -102,12 +111,18 @@ first occurrence, while `toObject()` keeps the last, as `JSON.parse()` does.
 * `pointer` {string} A [JSON Pointer][], relative to this view.
 * Returns: {any} The value, or `undefined` if there is none.
 
+Throws `ERR_INVALID_ARG_VALUE` if `pointer` is not a valid JSON Pointer: it is
+neither empty nor starts with `/`, or a `~` is not followed by `0` or `1`.
+
 ### `jsonObject.toObject()`
 
 * Returns: {Object}
 
 Converts the whole object, as `JSON.parse()` would. `toJSON()` is the same
 method, so `JSON.stringify()` accepts views.
+
+`util.inspect()` shows a view without converting it: nested containers are
+shown as views, down to the inspection depth.
 
 ## Class: `JSONArray`
 
@@ -140,6 +155,8 @@ order is linear overall. Iterating is still the fastest way to visit them.
 * `pointer` {string} A [JSON Pointer][], relative to this view.
 * Returns: {any}
 
+Like [`jsonObject.atPointer()`][].
+
 ### `jsonArray.toArray()`
 
 * Returns: {Array}
@@ -154,14 +171,15 @@ added: REPLACEME
 -->
 
 * `input` {string|Buffer|TypedArray|DataView|ArrayBuffer}
-* `schema` {Object} A JSON Schema, in the subset described below.
+* `schema` {Object|true} A JSON Schema, in the subset described below.
 * Returns: {any}
 
 Parses `input` and builds the value described by `schema`, straight from the
 parsed document. Every object described with `properties` gets exactly those
 properties, in schema order, and is built without an intermediate object.
 Properties of the input that the schema does not name are skipped, unless
-`additionalProperties` is `true`. A value of the wrong type throws an
+`additionalProperties` is `true`. When a key is repeated, the last value is
+used, as in `JSON.parse()`; earlier ones are not checked. A value of the wrong type throws an
 [`ERR_JSON_SCHEMA_VALIDATION`][] error that gives its location.
 
 ```mjs
@@ -201,20 +219,26 @@ long as the schema object is reachable, so reuse schema objects.
 Supported keywords:
 
 * `type`: a type name or an array of them: `'object'`, `'array'`, `'string'`,
-  `'number'`, `'integer'` (`1.0` counts as an integer), `'boolean'` and
-  `'null'`. `nullable: true` adds `'null'`.
+  `'number'`, `'integer'` (`1.0` counts as an integer; an integer too large
+  for a double does not), `'boolean'` and `'null'`. `nullable: true` adds
+  `'null'`, also to `enum` and `const`.
 * `properties`, `required`, and `additionalProperties` (`true` or `false`).
-  A missing property takes its `default` if it has one. Object and array
-  defaults are copied for each result.
+  `additionalProperties: false` or `required` without `properties` stand for
+  an empty property list. A missing property takes its `default` if it has
+  one. Defaults are checked against their property's schema when the schema
+  is compiled, and object and array defaults are copied for each result.
 * `items`, as a single schema.
-* `enum` and `const`, with strings, finite numbers, booleans and `null`.
+* `enum` and `const`, with strings, finite numbers, booleans and `null`. When
+  both are given, a value must satisfy both.
 * `$ref` to `'#'`, `'#/$defs/Name'` or `'#/definitions/Name'`, which allows
-  recursive schemas.
+  recursive schemas. Only annotations and `default` may appear next to
+  `$ref`. A `default` next to `$ref` takes precedence over one on the target.
 * `true` and `{}` accept any value, converted as `JSON.parse()` would.
 
 Annotations such as `title`, `description` and `format` are ignored. Any other
 keyword, such as `minimum`, `pattern` or `anyOf`, throws
-`ERR_INVALID_ARG_VALUE` instead of being ignored.
+`ERR_INVALID_ARG_VALUE` instead of being ignored. So does a schema that no
+value can match, such as an empty `enum`.
 
 Unlike in JSON Schema validation, an absent `additionalProperties` means
 `false`: `decode()` drops the properties a schema does not name.
@@ -227,4 +251,5 @@ Unlike in JSON Schema validation, an absent `additionalProperties` means
 [`JSONObject`]: #class-jsonobject
 [`json.decode()`]: #jsondecodeinput-schema
 [`json.parse()`]: #jsonparseinput
+[`jsonObject.atPointer()`]: #jsonobjectatpointerpointer
 [simdjson]: https://simdjson.org/

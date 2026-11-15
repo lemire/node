@@ -119,3 +119,23 @@ new Worker(`
   require('worker_threads').parentPort.postMessage(parse('{"x":[1,2,3]}').get('x').at(2));
 `, { eval: true, execArgv: ['--experimental-json'] })
   .on('message', common.mustCall((v) => assert.strictEqual(v, 3)));
+
+// Numbers convert as in JSON.parse.
+assert(Object.is(parse('-0'), -0));
+assert(Object.is(parse('[-0]').at(0), -0));
+assert(Object.is(parse('-0.0'), -0));
+assert.strictEqual(parse('1' + '0'.repeat(400)), Infinity);
+assert.strictEqual(parse('-' + '9'.repeat(30)), -1e30);
+// Known difference: simdjson rejects exponents beyond the double range.
+assert.throws(() => parse('1e309'), SyntaxError);
+
+// util.inspect() does not convert the whole document.
+{
+  const { inspect } = require('util');
+  const nested = parse('{"a":{"b":{"c":[1,{"d":2}]}},"e":[1,2]}');
+  assert.strictEqual(inspect(nested, { depth: 0 }),
+                     'JSONObject { a: [JSONObject], e: [JSONArray] }');
+  assert.strictEqual(inspect(nested.get('e')), 'JSONArray [ 1, 2 ]');
+  assert.strictEqual(inspect(nested, { depth: -1 }), '[JSONObject]');
+  assert.match(inspect(nested, { depth: Infinity }), /d: 2/);
+}

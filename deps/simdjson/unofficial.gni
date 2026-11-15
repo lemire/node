@@ -7,6 +7,7 @@
 template("simdjson_gn_build") {
   config("simdjson_config") {
     include_dirs = [ "." ]
+    defines = [ "SIMDJSON_MINUS_ZERO_AS_FLOAT=1" ]
   }
 
   gypi_values = exec_script("../../tools/gypi_to_gn.py",

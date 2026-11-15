@@ -118,3 +118,82 @@ for (const schema of [
   assert.throws(() => decode('1', schema), { code: 'ERR_INVALID_ARG_VALUE' });
 }
 assert.throws(() => decode('1', null), { code: 'ERR_INVALID_ARG_TYPE' });
+
+// Big integers: an integer only while the double is finite.
+assert.strictEqual(decode('1' + '0'.repeat(30), { type: 'integer' }), 1e30);
+assert.throws(() => decode('1' + '0'.repeat(400), { type: 'integer' }),
+              { code: 'ERR_JSON_SCHEMA_VALIDATION',
+                message: 'Expected integer, got number at $' });
+assert.strictEqual(decode('1' + '0'.repeat(400), { type: 'number' }),
+                   Infinity);
+assert(Object.is(decode('-0', { type: 'integer' }), -0));
+
+// Duplicate keys: the last value wins and earlier ones are not checked.
+const IntA = { properties: { a: { type: 'integer' } } };
+assert.deepStrictEqual(decode('{"a":"bad","a":1}', IntA), { a: 1 });
+assert.throws(() => decode('{"a":1,"a":"bad"}', IntA),
+              { message: 'Expected integer, got string at $.a' });
+assert.deepStrictEqual(
+  decode('{"x":1,"x":2}', { properties: {}, additionalProperties: true }),
+  { x: 2 });
+
+// With nullable, enum and const accept null; const and enum intersect.
+assert.strictEqual(decode('null', { enum: ['a'], nullable: true }), null);
+assert.strictEqual(decode('"a"', { enum: ['a'], nullable: true }), 'a');
+assert.strictEqual(decode('null', { const: 'a', nullable: true }), null);
+assert.strictEqual(decode('1', { const: 1, enum: [1, 2] }), 1);
+assert.throws(() => decode('2', { const: 1, enum: [1, 2] }),
+              { code: 'ERR_JSON_SCHEMA_VALIDATION' });
+
+// additionalProperties: false without properties keeps no property.
+assert.deepStrictEqual(decode('{"a":1}', { additionalProperties: false }), {});
+assert.strictEqual(decode('3', { additionalProperties: false }), 3);
+
+// The schema `true` accepts anything, like {}.
+assert.deepStrictEqual(decode('{"a":[1]}', true), { a: [1] });
+assert.throws(() => decode('1', false), { code: 'ERR_INVALID_ARG_TYPE' });
+
+// $ref: defaults on the target apply; one next to $ref overrides it.
+{
+  const defs = { $defs: { Vis: { enum: ['public', 'private'],
+                                 default: 'public' } } };
+  assert.deepStrictEqual(decode('{}', {
+    ...defs, properties: { v: { $ref: '#/$defs/Vis' } },
+  }), { v: 'public' });
+  assert.deepStrictEqual(decode('{}', {
+    ...defs, properties: { v: { $ref: '#/$defs/Vis', default: 'private' } },
+  }), { v: 'private' });
+}
+
+// Defaults are checked and normalized when the schema is compiled.
+assert.deepStrictEqual(
+  decode('{}', { properties: { o: { properties: { a: { type: 'integer' } },
+                                    default: { a: 1, extra: 2 } } } }),
+  { o: { a: 1 } });
+const circular = {};
+circular.self = circular;
+for (const def of [
+  'one',                                  // Wrong type
+  { toJSON() {} },                        // Not serializable
+  circular,
+  10n,
+  NaN,
+  { a: 'x' },                             // Nested mismatch
+]) {
+  assert.throws(() => decode('{}', {
+    properties: { p: { properties: { a: { type: 'integer' } }, type: 'object',
+                       default: def } },
+  }), { code: 'ERR_INVALID_ARG_VALUE' });
+}
+
+// More schemas rejected up front.
+for (const schema of [
+  { $ref: '#/$defs/N', minimum: 1, $defs: { N: {} } },
+  { $ref: '#/$defs/N', type: 'string', $defs: { N: {} } },
+  { enum: [] },
+  { type: 'string', enum: [1] },
+  { const: 1, enum: [2] },
+  { required: ['a'] },
+]) {
+  assert.throws(() => decode('1', schema), { code: 'ERR_INVALID_ARG_VALUE' });
+}
