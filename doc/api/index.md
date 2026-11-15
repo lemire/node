@@ -35,6 +35,7 @@
 * [HTTPS](https.md)
 * [Inspector](inspector.md)
 * [Internationalization](intl.md)
+* [JSON](json.md)
 * [Iterable Streams API](stream_iter.md)
 * [Modules: CommonJS modules](modules.md)
 * [Modules: ECMAScript modules](esm.md)

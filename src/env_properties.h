@@ -436,6 +436,10 @@
   V(iterationhistogram_constructor_template, v8::FunctionTemplate)             \
   V(iter_template, v8::DictionaryTemplate)                                     \
   V(js_transferable_constructor_template, v8::FunctionTemplate)                \
+  V(json_array_view_constructor_template, v8::FunctionTemplate)               \
+  V(json_document_constructor_template, v8::FunctionTemplate)                 \
+  V(json_object_view_constructor_template, v8::FunctionTemplate)              \
+  V(json_schema_plan_constructor_template, v8::FunctionTemplate)              \
   V(libuv_stream_wrap_ctor_template, v8::FunctionTemplate)                     \
   V(lock_holder_constructor_template, v8::FunctionTemplate)                    \
   V(lock_info_template, v8::DictionaryTemplate)                                \

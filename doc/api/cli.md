@@ -1535,6 +1535,16 @@ added:
 
 Enable experimental support for inspector network resources.
 
+### `--experimental-json`
+
+<!-- YAML
+added: REPLACEME
+-->
+
+> Stability: 1.0 - Early development
+
+Enable the experimental [`node:json`][] module.
+
 ### `--experimental-network-inspection`
 
 <!-- YAML
@@ -4312,6 +4322,7 @@ one is included in the list below.
 * `--experimental-eventsource`
 * `--experimental-import-meta-resolve`
 * `--experimental-import-text`
+* `--experimental-json`
 * `--experimental-json-modules`
 * `--experimental-modules`
 * `--experimental-package-map`
@@ -4999,6 +5010,7 @@ node --stack-trace-limit=12 -p -e "Error.stackTraceLimit" # prints 12
 [`inspector.open()`]: inspector.md#inspectoropenport-host-wait
 [`net.getDefaultAutoSelectFamilyAttemptTimeout()`]: net.md#netgetdefaultautoselectfamilyattempttimeout
 [`node:ffi`]: ffi.md
+[`node:json`]: json.md
 [`node:sqlite`]: sqlite.md
 [`node:stream/iter`]: stream_iter.md
 [`node:vfs`]: vfs.md

@@ -2357,6 +2357,16 @@ for more information.
 
 IP is blocked by `net.BlockList`.
 
+<a id="ERR_JSON_SCHEMA_VALIDATION"></a>
+
+### `ERR_JSON_SCHEMA_VALIDATION`
+
+> Stability: 1.0 - Early development
+
+A value decoded by [`json.decode()`][] does not match its schema. The message
+names the expected and actual types and the location of the value, as in
+`Expected integer, got string at $.owner.id`.
+
 <a id="ERR_LOAD_SQLITE_EXTENSION"></a>
 
 ### `ERR_LOAD_SQLITE_EXTENSION`
@@ -4855,6 +4865,7 @@ An error occurred trying to allocate memory. This should never happen.
 [`hash.update()`]: crypto.md#hashupdatedata-inputencoding
 [`http`]: http.md
 [`https`]: https.md
+[`json.decode()`]: json.md#jsondecodeinput-schema
 [`libuv Error handling`]: https://docs.libuv.org/en/v1.x/errors.html
 [`mac.update()`]: crypto.md#macupdatedata-inputencoding
 [`net.Server`]: net.md#class-netserver

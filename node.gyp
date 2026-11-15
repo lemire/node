@@ -144,6 +144,7 @@
       'src/node_http_parser.cc',
       'src/node_http2.cc',
       'src/node_i18n.cc',
+      'src/node_json.cc',
       'src/node_ipc_serdes.cc',
       'src/node_locks.cc',
       'src/node_main_instance.cc',
@@ -801,6 +802,7 @@
       'include_dirs': [
         'src',
         'deps/postject',
+        'deps/v8/third_party/fast_float/src/include', # header-only
         '<(SHARED_INTERMEDIATE_DIR)' # for node_natives.h
       ],
       'dependencies': [

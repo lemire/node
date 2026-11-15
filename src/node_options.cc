@@ -814,6 +814,10 @@ EnvironmentOptionsParser::EnvironmentOptionsParser() {
             NoOp{},
 #endif
             kAllowedInEnvvar);
+  AddOption("--experimental-json",
+            "experimental node:json module",
+            BOOL_FIELD(experimental_json),
+            kAllowedInEnvvar);
   AddOption("--experimental-vfs",
             "experimental node:vfs module",
             BOOL_FIELD(experimental_vfs),

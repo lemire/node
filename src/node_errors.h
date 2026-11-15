@@ -107,6 +107,7 @@ void OOMErrorHandler(const char* location, const v8::OOMDetails& details);
   V(ERR_INVALID_OBJECT_DEFINE_PROPERTY, TypeError)                             \
   V(ERR_INVALID_MODULE, Error)                                                 \
   V(ERR_INVALID_STATE, Error)                                                  \
+  V(ERR_JSON_SCHEMA_VALIDATION, TypeError)                                     \
   V(ERR_INVALID_THIS, TypeError)                                               \
   V(ERR_INVALID_URL, TypeError)                                                \
   V(ERR_INVALID_URL_PATTERN, TypeError)                                        \

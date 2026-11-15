@@ -78,6 +78,7 @@
   V(internal_only_v8)                                                          \
   V(ipc_serdes)                                                                \
   V(js_stream)                                                                 \
+  V(json)                                                                      \
   V(locks)                                                                     \
   V(messaging)                                                                 \
   V(modules)                                                                   \
